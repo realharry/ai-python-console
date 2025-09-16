@@ -31,27 +31,41 @@ export function PythonConsole() {
   // Initialize PyScript
   useEffect(() => {
     const initPyScript = () => {
-      if (window.pyscript) {
-        setIsPyScriptReady(true);
-        setActive(true);
-        return;
-      }
-
-      // Check if PyScript is already loaded
+      // Set up periodic checks for PyScript readiness
       const checkPyScript = () => {
-        if (window.pyscript) {
+        if (window.pyscript && typeof window.run_python_code === 'function') {
           setIsPyScriptReady(true);
           setActive(true);
+          console.log('PyScript is ready!');
+          return;
+        }
+        
+        // Check for PyScript core availability
+        if (window.pyscript) {
+          console.log('PyScript core loaded, waiting for initialization...');
+          // Set a timeout to wait for full initialization
+          setTimeout(checkPyScript, 1000);
         } else {
-          setTimeout(checkPyScript, 100);
+          // Keep checking for PyScript to load
+          setTimeout(checkPyScript, 500);
         }
       };
 
+      // Start checking
       checkPyScript();
+      
+      // Set a maximum timeout for PyScript loading
+      setTimeout(() => {
+        if (!isPyScriptReady) {
+          console.log('PyScript loading timeout, enabling fallback mode');
+          setIsPyScriptReady(true); // Enable fallback mode
+          setActive(true);
+        }
+      }, 30000); // 30 seconds timeout
     };
 
     initPyScript();
-  }, [setActive]);
+  }, [setActive, isPyScriptReady]);
 
   // Handle code execution
   const executeCode = async () => {
@@ -65,28 +79,74 @@ export function PythonConsole() {
       
       // Try to use PyScript if available
       if (window.pyscript && typeof window.run_python_code === 'function') {
-        output = window.run_python_code(state.code);
-      } else {
-        // Fallback for basic Python-like operations
         try {
-          // Simple pattern matching for basic print statements
-          const printMatches = state.code.match(/print\((.*?)\)/g);
-          if (printMatches) {
-            const outputs = printMatches.map(match => {
-              const content = match.replace(/print\((['"])(.*?)\1\)/, '$2');
-              return content;
-            });
-            output = outputs.join('\n');
-          } else {
-            output = 'Code executed (PyScript not fully loaded)';
-          }
+          output = window.run_python_code(state.code);
         } catch (error) {
-          output = `Error: ${error instanceof Error ? error.message : String(error)}`;
+          output = `PyScript Error: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      } else {
+        // Fallback for basic Python-like operations when PyScript isn't ready
+        try {
+          // Enhanced pattern matching for common Python operations
+          let result: string[] = [];
+          
+          // Handle print statements
+          const printMatches = state.code.match(/print\s*\((.*?)\)/g);
+          if (printMatches) {
+            printMatches.forEach(match => {
+              // Extract content between parentheses
+              const content = match.replace(/print\s*\(\s*(['"`])(.*?)\1\s*\)/, '$2');
+              // Handle variables and expressions (basic)
+              if (content.includes('"') || content.includes("'") || content.includes('`')) {
+                result.push(content.replace(/(['"`])(.*?)\1/g, '$2'));
+              } else {
+                result.push(content);
+              }
+            });
+          }
+          
+          // Handle basic arithmetic
+          const mathMatch = state.code.match(/(\d+\s*[\+\-\*\/]\s*\d+)/g);
+          if (mathMatch && !printMatches) {
+            mathMatch.forEach(expr => {
+              try {
+                // Basic arithmetic evaluation (safe)
+                const cleanExpr = expr.replace(/\s/g, '');
+                if (/^\d+[\+\-\*\/]\d+$/.test(cleanExpr)) {
+                  const evalResult = Function('"use strict"; return (' + cleanExpr + ')')();
+                  result.push(`${expr} = ${evalResult}`);
+                }
+              } catch {
+                result.push(`${expr} = Error in calculation`);
+              }
+            });
+          }
+          
+          // Handle variable assignments (basic)
+          const assignmentMatch = state.code.match(/(\w+)\s*=\s*(.+)/g);
+          if (assignmentMatch && !printMatches && !mathMatch) {
+            assignmentMatch.forEach(assignment => {
+              const [, varName, value] = assignment.match(/(\w+)\s*=\s*(.+)/) || [];
+              if (varName && value) {
+                result.push(`${varName} assigned to ${value}`);
+              }
+            });
+          }
+          
+          output = result.length > 0 ? result.join('\n') : 'Code executed (PyScript not fully loaded)';
+          
+          // Add a note about limited functionality
+          if (result.length > 0) {
+            output += '\n\n[Note: Running in fallback mode. Full Python features available when PyScript loads.]';
+          }
+          
+        } catch (error) {
+          output = `Fallback Error: ${error instanceof Error ? error.message : String(error)}`;
         }
       }
 
       const executionTime = Date.now() - startTime;
-      const finalOutput = `${output}\n--- Executed in ${executionTime}ms ---`;
+      const finalOutput = `${output}\n\n--- Executed in ${executionTime}ms ---`;
       
       setOutput(finalOutput);
       addToHistory(state.code);
@@ -152,9 +212,13 @@ export function PythonConsole() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">AI Python Console</h1>
         <div className="flex items-center space-x-1">
-          <div className={`w-2 h-2 rounded-full ${isPyScriptReady ? 'bg-green-500' : 'bg-red-500'}`} />
+          <div className={`w-2 h-2 rounded-full ${isPyScriptReady ? 
+            (typeof window.run_python_code === 'function' ? 'bg-green-500' : 'bg-yellow-500') 
+            : 'bg-red-500'}`} />
           <span className="text-xs text-muted-foreground">
-            {isPyScriptReady ? 'Ready' : 'Loading PyScript...'}
+            {isPyScriptReady ? 
+              (typeof window.run_python_code === 'function' ? 'PyScript Ready' : 'Fallback Mode') 
+              : 'Loading PyScript...'}
           </span>
         </div>
       </div>
@@ -254,7 +318,9 @@ export function PythonConsole() {
           History: {state.history.length} commands
         </span>
         <span>
-          PyScript: {isPyScriptReady ? 'Ready' : 'Loading...'}
+          PyScript: {isPyScriptReady ? 
+            (typeof window.run_python_code === 'function' ? 'Ready' : 'Fallback') 
+            : 'Loading...'}
         </span>
       </div>
     </div>
