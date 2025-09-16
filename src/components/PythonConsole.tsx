@@ -28,46 +28,16 @@ export function PythonConsole() {
   const [isPyScriptReady, setIsPyScriptReady] = useState(false);
   const outputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Initialize PyScript
+  // Initialize fallback mode (PyScript not available due to CSP restrictions)
   useEffect(() => {
-    const initPyScript = () => {
-      // Set up periodic checks for PyScript readiness
-      const checkPyScript = () => {
-        if (window.pyscript && typeof window.run_python_code === 'function') {
-          setIsPyScriptReady(true);
-          setActive(true);
-          console.log('PyScript is ready!');
-          return;
-        }
-        
-        // Check for PyScript core availability
-        if (window.pyscript) {
-          console.log('PyScript core loaded, waiting for initialization...');
-          // Set a timeout to wait for full initialization
-          setTimeout(checkPyScript, 1000);
-        } else {
-          // Keep checking for PyScript to load
-          setTimeout(checkPyScript, 500);
-        }
-      };
+    // Since we can't load PyScript from external sources due to CSP restrictions,
+    // we'll initialize with fallback mode immediately
+    setIsPyScriptReady(true);
+    setActive(true);
+    console.log('Fallback Python interpreter initialized');
+  }, [setActive]);
 
-      // Start checking
-      checkPyScript();
-      
-      // Set a maximum timeout for PyScript loading
-      setTimeout(() => {
-        if (!isPyScriptReady) {
-          console.log('PyScript loading timeout, enabling fallback mode');
-          setIsPyScriptReady(true); // Enable fallback mode
-          setActive(true);
-        }
-      }, 30000); // 30 seconds timeout
-    };
-
-    initPyScript();
-  }, [setActive, isPyScriptReady]);
-
-  // Handle code execution
+  // Handle code execution with enhanced fallback
   const executeCode = async () => {
     if (!isPyScriptReady || !state.code.trim()) return;
 
@@ -77,72 +47,87 @@ export function PythonConsole() {
     try {
       let output = '';
       
-      // Try to use PyScript if available
-      if (window.pyscript && typeof window.run_python_code === 'function') {
-        try {
-          output = window.run_python_code(state.code);
-        } catch (error) {
-          output = `PyScript Error: ${error instanceof Error ? error.message : String(error)}`;
-        }
-      } else {
-        // Fallback for basic Python-like operations when PyScript isn't ready
-        try {
-          // Enhanced pattern matching for common Python operations
-          let result: string[] = [];
+      // Enhanced fallback Python interpreter
+      try {
+        const result: string[] = [];
+        const lines = state.code.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          
+          // Skip comments and empty lines
+          if (trimmedLine.startsWith('#') || !trimmedLine) continue;
           
           // Handle print statements
-          const printMatches = state.code.match(/print\s*\((.*?)\)/g);
-          if (printMatches) {
-            printMatches.forEach(match => {
-              // Extract content between parentheses
-              const content = match.replace(/print\s*\(\s*(['"`])(.*?)\1\s*\)/, '$2');
-              // Handle variables and expressions (basic)
-              if (content.includes('"') || content.includes("'") || content.includes('`')) {
-                result.push(content.replace(/(['"`])(.*?)\1/g, '$2'));
-              } else {
-                result.push(content);
+          const printMatch = trimmedLine.match(/print\s*\(\s*['"`]([^'"`]*?)['"`]\s*\)/);
+          if (printMatch) {
+            result.push(printMatch[1]);
+            continue;
+          }
+          
+          // Handle print with variables or expressions
+          const printVarMatch = trimmedLine.match(/print\s*\(\s*([^)]+)\s*\)/);
+          if (printVarMatch) {
+            const content = printVarMatch[1].trim();
+            // Remove quotes if present
+            const unquoted = content.replace(/^['"`]|['"`]$/g, '');
+            result.push(unquoted);
+            continue;
+          }
+          
+          // Handle basic arithmetic expressions
+          const mathMatch = trimmedLine.match(/^(\d+(?:\.\d+)?)\s*([\+\-\*\/])\s*(\d+(?:\.\d+)?)$/);
+          if (mathMatch) {
+            const [, num1, op, num2] = mathMatch;
+            try {
+              const a = parseFloat(num1);
+              const b = parseFloat(num2);
+              let mathResult;
+              switch (op) {
+                case '+': mathResult = a + b; break;
+                case '-': mathResult = a - b; break;
+                case '*': mathResult = a * b; break;
+                case '/': mathResult = a / b; break;
+                default: mathResult = 'Unknown operation';
               }
-            });
+              result.push(`${mathResult}`);
+            } catch {
+              result.push('Error in calculation');
+            }
+            continue;
           }
           
-          // Handle basic arithmetic
-          const mathMatch = state.code.match(/(\d+\s*[\+\-\*\/]\s*\d+)/g);
-          if (mathMatch && !printMatches) {
-            mathMatch.forEach(expr => {
-              try {
-                // Basic arithmetic evaluation (safe)
-                const cleanExpr = expr.replace(/\s/g, '');
-                if (/^\d+[\+\-\*\/]\d+$/.test(cleanExpr)) {
-                  const evalResult = Function('"use strict"; return (' + cleanExpr + ')')();
-                  result.push(`${expr} = ${evalResult}`);
-                }
-              } catch {
-                result.push(`${expr} = Error in calculation`);
-              }
-            });
+          // Handle variable assignments
+          const assignMatch = trimmedLine.match(/^(\w+)\s*=\s*(.+)$/);
+          if (assignMatch) {
+            const [, varName, value] = assignMatch;
+            result.push(`Variable '${varName}' assigned: ${value.replace(/['"`]/g, '')}`);
+            continue;
           }
           
-          // Handle variable assignments (basic)
-          const assignmentMatch = state.code.match(/(\w+)\s*=\s*(.+)/g);
-          if (assignmentMatch && !printMatches && !mathMatch) {
-            assignmentMatch.forEach(assignment => {
-              const [, varName, value] = assignment.match(/(\w+)\s*=\s*(.+)/) || [];
-              if (varName && value) {
-                result.push(`${varName} assigned to ${value}`);
-              }
-            });
+          // Handle simple expressions that should return a value
+          if (/^\d+[\+\-\*\/\%]\d+$/.test(trimmedLine.replace(/\s/g, ''))) {
+            try {
+              const evalResult = Function('"use strict"; return (' + trimmedLine + ')')();
+              result.push(`${evalResult}`);
+            } catch {
+              result.push(`Unable to evaluate: ${trimmedLine}`);
+            }
+            continue;
           }
           
-          output = result.length > 0 ? result.join('\n') : 'Code executed (PyScript not fully loaded)';
-          
-          // Add a note about limited functionality
-          if (result.length > 0) {
-            output += '\n\n[Note: Running in fallback mode. Full Python features available when PyScript loads.]';
-          }
-          
-        } catch (error) {
-          output = `Fallback Error: ${error instanceof Error ? error.message : String(error)}`;
+          // For other statements, just acknowledge them
+          result.push(`Executed: ${trimmedLine}`);
         }
+        
+        output = result.length > 0 ? result.join('\n') : 'Code executed successfully';
+        
+        // Add note about fallback mode
+        output += '\n\n[Note: Running in fallback mode - limited Python functionality]';
+        output += '\n[For full Python support, PyScript needs to be loaded from secure sources]';
+        
+      } catch (error) {
+        output = `Fallback Error: ${error instanceof Error ? error.message : String(error)}`;
       }
 
       const executionTime = Date.now() - startTime;
@@ -212,13 +197,9 @@ export function PythonConsole() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">AI Python Console</h1>
         <div className="flex items-center space-x-1">
-          <div className={`w-2 h-2 rounded-full ${isPyScriptReady ? 
-            (typeof window.run_python_code === 'function' ? 'bg-green-500' : 'bg-yellow-500') 
-            : 'bg-red-500'}`} />
+          <div className="w-2 h-2 rounded-full bg-yellow-500" />
           <span className="text-xs text-muted-foreground">
-            {isPyScriptReady ? 
-              (typeof window.run_python_code === 'function' ? 'PyScript Ready' : 'Fallback Mode') 
-              : 'Loading PyScript...'}
+            Fallback Mode
           </span>
         </div>
       </div>

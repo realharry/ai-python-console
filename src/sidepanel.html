@@ -4,79 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Python Console</title>
-    
-    <!-- PyScript CSS -->
-    <link
-      rel="stylesheet"
-      href="https://pyscript.net/releases/2024.1.1/core.css"
-    />
-    
-    <!-- PyScript JS -->
-    <script
-      type="module"
-      src="https://pyscript.net/releases/2024.1.1/core.js"
-    ></script>
   </head>
   <body>
     <div id="root"></div>
-    
-    <!-- PyScript configuration -->
-    <py-config>
-      packages = []
-      
-      [[fetch]]
-      from = "https://cdn.jsdelivr.net/pyodide"
-      to_folder = "lib"
-    </py-config>
-    
-    <!-- Initialize PyScript -->
-    <py-script>
-      # Initialize PyScript environment
-      import sys
-      import io
-      from contextlib import redirect_stdout
-      
-      # Setup output capture
-      class OutputCapture:
-          def __init__(self):
-              self.output = []
-          
-          def write(self, text):
-              self.output.append(text)
-              return len(text)
-          
-          def flush(self):
-              pass
-          
-          def get_output(self):
-              result = ''.join(self.output)
-              self.output.clear()
-              return result
-      
-      # Make output capture available globally
-      _output_capture = OutputCapture()
-      
-      def run_code(code):
-          """Execute Python code and capture output"""
-          old_stdout = sys.stdout
-          sys.stdout = _output_capture
-          
-          try:
-              exec(code)
-              output = _output_capture.get_output()
-              return output if output else "Code executed successfully"
-          except Exception as e:
-              return f"Error: {str(e)}"
-          finally:
-              sys.stdout = old_stdout
-      
-      # Make function available to JavaScript
-      from pyscript import window
-      window.run_python_code = run_code
-      
-      print("PyScript initialized successfully!")
-    </py-script>
-    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
