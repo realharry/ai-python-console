@@ -3,10 +3,13 @@
 let consoleActive = false;
 
 // Handle extension icon click
-chrome.action.onClicked.addListener(async (_tab) => {
+chrome.action.onClicked.addListener(async (tab) => {
   try {
-    await chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
-    setConsoleActive(true);
+    // Open side panel for the current tab
+    if (tab.id && tab.windowId) {
+      await chrome.sidePanel.open({ tabId: tab.id, windowId: tab.windowId });
+      setConsoleActive(true);
+    }
   } catch (error) {
     console.error('Error opening side panel:', error);
   }
@@ -45,10 +48,12 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Handle tab updates to maintain side panel
-chrome.tabs.onActivated.addListener(async (_activeInfo) => {
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (consoleActive) {
     try {
-      await chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+      // Get the current window to provide windowId
+      const currentWindow = await chrome.windows.getCurrent();
+      await chrome.sidePanel.open({ tabId: activeInfo.tabId, windowId: currentWindow.id || 0 });
     } catch (error) {
       // Side panel might not be available on this tab
       console.log('Side panel not available on this tab');
