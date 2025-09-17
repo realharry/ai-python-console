@@ -299,9 +299,7 @@ export function PythonConsole() {
           History: {state.history.length} commands
         </span>
         <span>
-          PyScript: {isPyScriptReady ? 
-            (typeof window.run_python_code === 'function' ? 'Ready' : 'Fallback') 
-            : 'Loading...'}
+          Fallback Mode
         </span>
       </div>
     </div>

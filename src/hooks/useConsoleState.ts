@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Storage, ConsoleState } from '@/lib/storage';
 
+// Check if Chrome extension APIs are available
+const isChromeExtension = () => {
+  return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage;
+};
+
 export function useConsoleState() {
   const [state, setState] = useState<ConsoleState>({
     code: '',
@@ -17,8 +22,8 @@ export function useConsoleState() {
         const savedState = await Storage.getState();
         setState(savedState);
         
-        // Notify background script that console is active
-        if (savedState.isActive) {
+        // Notify background script that console is active (only in Chrome extension context)
+        if (savedState.isActive && isChromeExtension()) {
           chrome.runtime.sendMessage({
             type: 'CONSOLE_STATE_CHANGED',
             active: true
@@ -41,8 +46,8 @@ export function useConsoleState() {
       // Persist to storage
       Storage.setState(newState);
       
-      // Notify background script if active state changed
-      if (updates.isActive !== undefined) {
+      // Notify background script if active state changed (only in Chrome extension context)
+      if (updates.isActive !== undefined && isChromeExtension()) {
         chrome.runtime.sendMessage({
           type: 'CONSOLE_STATE_CHANGED',
           active: updates.isActive
