@@ -17,13 +17,12 @@ export default defineConfig({
         background: resolve(__dirname, 'src/background.ts'),
       },
       output: {
-        entryFileNames: (chunkInfo) => {
-          return chunkInfo.name === 'sidepanel' ? 'sidepanel.js' : '[name].js';
-        },
+        entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
         assetFileNames: (assetInfo) => {
-          if (assetInfo.name === 'sidepanel.html') {
-            return 'sidepanel.html';
+          // Ensure HTML files go to root, not in nested directories
+          if (assetInfo.name && assetInfo.name.endsWith('.html')) {
+            return '[name].[ext]';
           }
           return '[name].[ext]';
         }
