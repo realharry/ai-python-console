@@ -2,15 +2,11 @@
   "manifest_version": 3,
   "name": "AI Python Console",
   "version": "1.0.0",
-  "description": "A Chrome extension with a side panel Python console using PyScript",
+  "description": "A Chrome extension with a side panel Python console using fallback interpreter",
   "permissions": [
     "storage",
     "sidePanel",
     "activeTab"
-  ],
-  "host_permissions": [
-    "https://pyscript.net/*",
-    "https://cdn.jsdelivr.net/*"
   ],
   "background": {
     "service_worker": "background.js"
