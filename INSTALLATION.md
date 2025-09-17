@@ -1,55 +1,106 @@
 # AI Python Console - Installation Guide
 
-## How to Install and Test the Chrome Extension
+## How to Install and Use the Chrome Extension
 
 ### Prerequisites
 - Google Chrome browser
-- Basic understanding of Chrome extension development (optional)
+- Node.js (version 16 or higher)
+- npm package manager
 
-### Installation Steps
+### Quick Installation
 
-1. **Build the Extension** (if you haven't already):
+1. **Clone and Install Dependencies**:
    ```bash
+   git clone https://github.com/realharry/ai-python-console.git
+   cd ai-python-console
    npm install
-   npm run build
    ```
 
-2. **Load the Extension in Chrome**:
+2. **Build the Extension**:
+   ```bash
+   npm run build
+   ```
+   
+   This command will:
+   - Compile TypeScript
+   - Build the React application with Vite
+   - Run the post-build script to organize files correctly
+   - Place `sidepanel.html` in the root of the `dist` directory (where Chrome expects it)
+
+3. **Load the Extension in Chrome**:
    - Open Chrome and navigate to `chrome://extensions/`
    - Enable "Developer mode" (toggle in the top right)
    - Click "Load unpacked"
    - Select the `dist` folder from this project
-   - The extension should now appear in your extensions list
+   - ✅ **The extension should now load without any errors**
 
-3. **Open the Python Console**:
+### Using the Python Console
+
+1. **Open the Console**:
    - Look for the AI Python Console icon in your Chrome toolbar
    - Click the icon to open the side panel
-   - The Python console will open on the right side of your browser
 
-### Features
+2. **Write and Execute Python Code**:
+   - Enter Python code in the top text area
+   - Click "Run" or press Ctrl+Enter to execute
+   - View results in the output area below
 
-- **Python Code Execution**: Write and execute Python code using PyScript
-- **State Persistence**: Your code and output are saved even when closing the panel
-- **Active Badge**: Extension icon shows a green badge when the console is active
-- **Code Management**: Run, clear, copy, and download your Python code
-- **Fallback Mode**: Basic functionality even when PyScript is loading
+3. **Features Available**:
+   - **Run Code**: Execute Python-like code with fallback interpreter
+   - **Clear**: Clear code or output areas
+   - **Copy**: Copy output to clipboard
+   - **Download**: Save your Python code as a .py file
+   - **Persistent State**: Code and output saved across browser sessions
 
-### Usage
+### Important Notes
 
-1. **Write Python Code**: Enter your Python code in the top text area
-2. **Execute Code**: Click "Run" or press Ctrl+Enter
-3. **View Output**: Results appear in the bottom text area
-4. **Manage Code**: Use buttons to clear, copy, or download your code
+#### File Structure
+The build process ensures the correct file structure:
+```
+dist/
+├── sidepanel.html      ← Must be in root directory
+├── manifest.json       ← Chrome extension manifest
+├── background.js       ← Service worker
+├── sidepanel.js        ← Main application
+├── sidepanel.css       ← Styles
+└── icon*.png          ← Extension icons
+```
+
+#### Python Functionality
+- Uses a **fallback Python interpreter** due to Chrome Web Store security requirements
+- Supports basic Python operations: print statements, arithmetic, variable assignments
+- For full Python functionality, PyScript would need to be bundled locally
+
+#### Build Process
+The automated build process (`npm run build`) includes:
+1. TypeScript compilation
+2. Vite bundling
+3. **Post-build script** that moves `sidepanel.html` to the correct location
+4. Copying manifest and icons to the dist directory
 
 ### Troubleshooting
 
-- **PyScript Loading**: Wait for PyScript to fully load (up to 30 seconds)
-- **Fallback Mode**: Basic operations work even when PyScript isn't ready
-- **Permissions**: Make sure the extension has the required permissions
+#### "Side panel file path must exist" Error
+This error occurs when `sidepanel.html` is not in the root of the `dist` directory.
 
-### Technical Details
+**Solution**: Always use `npm run build` (not just `vite build`) to ensure the post-build script runs and places files correctly.
 
-- Built with React, TypeScript, Vite, and Tailwind CSS
-- Uses PyScript for Python execution in the browser
-- Chrome Storage API for state persistence
-- Manifest V3 compatible
+#### Build Errors
+If you encounter build errors:
+1. Make sure you have the latest dependencies: `npm install`
+2. Clear any existing build: `rm -rf dist/`
+3. Run the full build: `npm run build`
+
+#### Extension Not Loading
+1. Verify the `dist` directory contains `sidepanel.html` in the root
+2. Check that `manifest.json` exists in the `dist` directory
+3. Try reloading the extension in Chrome's extension page
+
+### Development
+
+For development work:
+- Use `npm run dev` to start the Vite development server
+- Use `npm run lint` to check TypeScript types
+- Always test with `npm run build` before deployment
+
+The extension is now ready for production use and Chrome Web Store submission!
